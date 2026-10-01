@@ -41,9 +41,17 @@ class TestFormatSongText:
         text = "line1\r\nline2\rline3"
         assert learn.format_song_text(text) == "line1\nline2\nline3"
 
-    def test_removes_markdown_headers(self):
+    def test_converts_markdown_headers_to_bold_html(self):
         text = "### Chorus\nSome lyrics"
-        assert learn.format_song_text(text) == "Chorus\nSome lyrics"
+        assert learn.format_song_text(text) == "<b>Chorus</b>\nSome lyrics"
+
+    def test_converts_markdown_bold_to_html(self):
+        text = "**Em C G D**\nLyrics"
+        assert learn.format_song_text(text) == "<b>Em C G D</b>\nLyrics"
+
+    def test_escapes_html_special_characters(self):
+        text = "5 < 10 & 10 > 5"
+        assert learn.format_song_text(text) == "5 &lt; 10 &amp; 10 &gt; 5"
 
     def test_replaces_nbsp_and_ideographic_space(self):
         text = "hello&nbsp;world　!"

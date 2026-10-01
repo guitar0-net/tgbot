@@ -1,3 +1,4 @@
+import html
 import re
 
 import resvg_py
@@ -30,15 +31,24 @@ def get_watch_url(embed_or_watch_url: str) -> str:
 
 
 def format_song_text(raw_text: str) -> str:
+    """Convert the song's Markdown text (from the API) to Telegram HTML markup."""
     if not raw_text:
         return ""
     text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
     text = text.replace("&nbsp;", " ").replace("\u3000", " ")
+    text = html.escape(text, quote=False)
+
     lines = []
     for line in text.split("\n"):
-        line = re.sub(r"^#{1,6}\s*", "", line)
+        line = line.rstrip()
+        header_match = re.match(r"^#{1,6}\s*(.*)$", line)
+        if header_match:
+            content = header_match.group(1).strip()
+            line = f"<b>{content}</b>" if content else ""
         lines.append(line)
     text = "\n".join(lines)
+
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
@@ -173,6 +183,36 @@ async def show_lesson(message: types.Message, query: str) -> bool:
     return True
 
 
+def _chunk_html_message(text: str, limit: int = 3900) -> list[str]:
+    """Split text into chunks without breaking lines, so HTML tags stay intact."""
+    lines = text.split("\n")
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    def flush():
+        if current:
+            chunks.append("\n".join(current))
+            current.clear()
+
+    for line in lines:
+        if len(line) > limit:
+            flush()
+            current_len = 0
+            for i in range(0, len(line), limit):
+                chunks.append(line[i : i + limit])
+            continue
+        line_len = len(line) + 1
+        if current and current_len + line_len > limit:
+            flush()
+            current_len = 0
+        current.append(line)
+        current_len += line_len
+
+    flush()
+    return chunks or [""]
+
+
 @router.callback_query(F.data.startswith("song:"))
 async def callback_song(callback: types.CallbackQuery):
     await callback.answer()
@@ -216,7 +256,7 @@ async def callback_song(callback: types.CallbackQuery):
         return
 
     song = songs_detail[song_idx]
-    title = song.get("title", "Песня")
+    title = html.escape(song.get("title", "Песня"), quote=False)
     metronome = song.get("metronome")
     schemes = song.get("schemes", [])
     chords = song.get("chords", [])
@@ -229,13 +269,15 @@ async def callback_song(callback: types.CallbackQuery):
 
     if schemes:
         scheme_names = [
-            s.get("inscription") or s.get("title") for s in schemes if (s.get("inscription") or s.get("title"))
+            html.escape(s.get("inscription") or s.get("title"), quote=False)
+            for s in schemes
+            if (s.get("inscription") or s.get("title"))
         ]
         if scheme_names:
             msg_parts.append(f"🥁 Бой/перебор: {', '.join(scheme_names)}")
 
     if chords:
-        chord_names = [c.get("title") for c in chords if c.get("title")]
+        chord_names = [html.escape(c.get("title"), quote=False) for c in chords if c.get("title")]
         if chord_names:
             msg_parts.append(f"🎸 Аккорды в песне: {', '.join(chord_names)}")
 
@@ -247,11 +289,10 @@ async def callback_song(callback: types.CallbackQuery):
 
     if callback.message:
         if len(full_message) <= 4000:
-            await callback.message.answer(full_message)
+            await callback.message.answer(full_message, parse_mode="HTML")
         else:
-            chunks = [full_message[i : i + 3900] for i in range(0, len(full_message), 3900)]
-            for chunk in chunks:
-                await callback.message.answer(chunk)
+            for chunk in _chunk_html_message(full_message):
+                await callback.message.answer(chunk, parse_mode="HTML")
 
 
 def get_chords_keyboard() -> ReplyKeyboardMarkup:
