@@ -352,6 +352,28 @@ class TestCallbackSong:
         assert callback.message.answer.await_count > 1
 
 
+class TestChunkHtmlMessage:
+    def test_short_text_is_single_chunk(self):
+        assert learn._chunk_html_message("a\nb") == ["a\nb"]
+
+    def test_empty_text_returns_single_empty_chunk(self):
+        assert learn._chunk_html_message("") == [""]
+
+    def test_splits_between_lines_without_breaking_them(self):
+        lines = ["<b>line</b>"] * 10
+
+        chunks = learn._chunk_html_message("\n".join(lines), limit=50)
+
+        assert len(chunks) > 1
+        assert all(len(chunk) <= 50 for chunk in chunks)
+        assert "\n".join(chunks) == "\n".join(lines)
+
+    def test_splits_overlong_line_into_pieces(self):
+        chunks = learn._chunk_html_message("ab\n" + "x" * 25 + "\ncd", limit=10)
+
+        assert chunks == ["ab", "x" * 10, "x" * 10, "x" * 5, "cd"]
+
+
 class TestGetChordsKeyboard:
     def test_deduplicates_and_skips_numeric_titles(self):
         learn.data_chords = {
