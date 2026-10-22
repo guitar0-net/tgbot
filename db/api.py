@@ -1,3 +1,4 @@
+import contextlib
 import json
 import os
 
@@ -27,20 +28,16 @@ async def fetch_or_load_cache(session: aiohttp.ClientSession, url: str, filename
             raise
     else:
         # A cache write failure must not discard data we have just fetched.
-        try:
+        with contextlib.suppress(Exception):
             async with aiofiles.open(file_path, "w", encoding="utf-8") as file:
                 await file.write(json.dumps(data, ensure_ascii=False, indent=4))
-        except Exception:
-            pass
         return data
 
     if os.path.exists(file_path):
-        try:
+        with contextlib.suppress(Exception):
             async with aiofiles.open(file_path, encoding="utf-8") as file:
                 content = await file.read()
                 return json.loads(content)
-        except Exception:
-            pass
 
     return {"results": []}
 

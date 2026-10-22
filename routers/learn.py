@@ -1,3 +1,4 @@
+import contextlib
 import html
 import re
 
@@ -374,13 +375,11 @@ async def show_chord(message: types.Message, query: str) -> bool:
         is_last = i == len(shown)
         markup = get_main_keyboard() if is_last else None
         if svg:
-            try:
+            with contextlib.suppress(Exception):
                 png_bytes = render_chord_svg(svg)
                 photo = types.BufferedInputFile(png_bytes, filename=f"chord_{chord.get('id', i)}.png")
                 await message.answer_photo(photo=photo, caption=caption, reply_markup=markup)
                 continue
-            except Exception:
-                pass
         await message.answer(caption, reply_markup=markup)
 
     return True

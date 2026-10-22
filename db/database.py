@@ -104,16 +104,20 @@ class Database:
         day = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
         week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
 
-        def count(where: str, param: str | None = None) -> int:
-            query = "SELECT COUNT(*) FROM users" + (f" WHERE {where}" if where else "")
-            return self.conn.execute(query, (param,) if param else ()).fetchone()[0]
+        row = self.conn.execute(
+            "SELECT COUNT(*),"
+            " COALESCE(SUM(first_seen >= ?), 0), COALESCE(SUM(first_seen >= ?), 0),"
+            " COALESCE(SUM(last_seen >= ?), 0), COALESCE(SUM(last_seen >= ?), 0)"
+            " FROM users",
+            (day, week, day, week),
+        ).fetchone()
 
         return {
-            "total": count(""),
-            "new_day": count("first_seen >= ?", day),
-            "new_week": count("first_seen >= ?", week),
-            "active_day": count("last_seen >= ?", day),
-            "active_week": count("last_seen >= ?", week),
+            "total": row[0],
+            "new_day": row[1],
+            "new_week": row[2],
+            "active_day": row[3],
+            "active_week": row[4],
         }
 
     # --- Admin management ---
