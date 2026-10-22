@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 
 from db.database import SQLiteStorage, db
 from routers import admin, base, learn
+from routers.middleware import UserTrackingMiddleware
 
 load_dotenv()
 
 TOKEN = os.getenv("BOT_TOKEN")
-
 
 async def main():
     if not TOKEN:
@@ -21,6 +21,8 @@ async def main():
 
     bot = Bot(token=TOKEN)
     dp = Dispatcher(storage=SQLiteStorage(db))
+
+    dp.update.outer_middleware(UserTrackingMiddleware())
 
     dp.include_router(base.router)
     dp.include_router(learn.router)

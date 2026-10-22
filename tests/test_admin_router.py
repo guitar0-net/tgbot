@@ -89,13 +89,23 @@ class TestReplaceMessage:
     async def test_falls_back_to_answer_on_bad_request(self, make_message):
         message = make_message()
         message.edit_text = AsyncMock(
-            side_effect=TelegramBadRequest(method=EditMessageText(text="x"), message="message is not modified")
+            side_effect=TelegramBadRequest(method=EditMessageText(text="x"), message="message to edit not found")
         )
         markup = admin._build_admin_keyboard()
 
         await admin._replace_message(message, "hello", markup)
 
         message.answer.assert_awaited_once_with("hello", parse_mode="HTML", reply_markup=markup)
+
+    async def test_not_modified_is_ignored(self, make_message):
+        message = make_message()
+        message.edit_text = AsyncMock(
+            side_effect=TelegramBadRequest(method=EditMessageText(text="x"), message="message is not modified")
+        )
+
+        await admin._replace_message(message, "hello", admin._build_admin_keyboard())
+
+        message.answer.assert_not_awaited()
 
 
 class TestCmdAdmin:
@@ -146,7 +156,7 @@ class TestCbReload:
     async def test_reloads_data_successfully(self, make_callback, monkeypatch):
         monkeypatch.setenv("ADMIN_ID", "42")
 
-        async def fake_load_data():
+        async def fake_load_data(strict=False):
             learn_module.data_lessons = {"results": [1, 2]}
             learn_module.data_chords = {"results": [1]}
 
@@ -162,7 +172,7 @@ class TestCbReload:
     async def test_reports_error_on_exception(self, make_callback, monkeypatch):
         monkeypatch.setenv("ADMIN_ID", "42")
 
-        async def failing_load_data():
+        async def failing_load_data(strict=False):
             raise RuntimeError("api down")
 
         monkeypatch.setattr(learn_module, "load_data", failing_load_data)
@@ -191,7 +201,7 @@ class TestCbList:
 
         await admin.cb_list(callback)
 
-        text = callback.message.answer.call_args.args[0]
+        text = callback.message.edit_text.call_args.args[0]
         assert "Boss" in text
 
     async def test_no_access(self, make_callback, monkeypatch):
@@ -323,7 +333,7 @@ class TestRemoveAdminFlow:
 
         await admin.cb_remove_start(callback, fsm_context)
 
-        markup = callback.message.answer.call_args.kwargs["reply_markup"]
+        markup = callback.message.edit_text.call_args.kwargs["reply_markup"]
         button_texts = [btn.text for row in markup.inline_keyboard for btn in row]
         assert any("Target" in t for t in button_texts)
 
@@ -333,7 +343,7 @@ class TestRemoveAdminFlow:
 
         await admin.cb_remove_start(callback, fsm_context)
 
-        text = callback.message.answer.call_args.args[0]
+        text = callback.message.edit_text.call_args.args[0]
         assert "Нет администраторов" in text
 
     async def test_cb_remove_confirm_removes_admin(self, make_callback, monkeypatch):
@@ -344,7 +354,7 @@ class TestRemoveAdminFlow:
         await admin.cb_remove_confirm(callback)
 
         assert db.is_admin(200) is False
-        text = callback.message.answer.call_args.args[0]
+        text = callback.message.edit_text.call_args.args[0]
         assert "удалён" in text
 
     async def test_cb_remove_confirm_not_found(self, make_callback, monkeypatch):
@@ -353,7 +363,7 @@ class TestRemoveAdminFlow:
 
         await admin.cb_remove_confirm(callback)
 
-        text = callback.message.answer.call_args.args[0]
+        text = callback.message.edit_text.call_args.args[0]
         assert "не найден" in text
 
     async def test_cb_remove_manual_sets_state(self, make_callback, fsm_context, monkeypatch):
@@ -410,14 +420,15 @@ class TestBackAndCancel:
 
         callback.message.edit_text.assert_not_awaited()
 
-    async def test_cb_cancel_clears_state(self, make_callback, fsm_context):
+    async def test_cb_cancel_clears_state(self, make_callback, fsm_context, monkeypatch):
         await fsm_context.set_state(admin.AdminState.waiting_add_id)
-        callback = make_callback()
+        callback = make_callback(user=make_user(user_id=42))
+        monkeypatch.setenv("ADMIN_ID", "42")
 
         await admin.cb_cancel(callback, fsm_context)
 
         assert await fsm_context.get_state() is None
-        callback.message.answer.assert_awaited_once()
+        callback.message.edit_text.assert_awaited_once()
 
 
 class TestTextCommands:
@@ -579,7 +590,7 @@ class TestTextCommands:
     async def test_reload_data_success(self, make_message, monkeypatch):
         monkeypatch.setenv("ADMIN_ID", "42")
 
-        async def fake_load_data():
+        async def fake_load_data(strict=False):
             learn_module.data_lessons = {"results": [1]}
             learn_module.data_chords = {"results": [1, 2]}
 
@@ -594,7 +605,7 @@ class TestTextCommands:
     async def test_reload_data_error(self, make_message, monkeypatch):
         monkeypatch.setenv("ADMIN_ID", "42")
 
-        async def failing_load_data():
+        async def failing_load_data(strict=False):
             raise RuntimeError("boom")
 
         monkeypatch.setattr(learn_module, "load_data", failing_load_data)

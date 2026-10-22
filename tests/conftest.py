@@ -43,6 +43,9 @@ def make_bot_message(text=None, user=None):
     msg.answer = AsyncMock()
     msg.answer_photo = AsyncMock()
     msg.edit_text = AsyncMock()
+    msg.delete = AsyncMock()
+    msg.reply = AsyncMock()
+    msg.bot = MagicMock(edit_message_text=AsyncMock(), delete_message=AsyncMock(), copy_message=AsyncMock())
     return msg
 
 

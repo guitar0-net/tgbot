@@ -34,6 +34,16 @@ class Database:
             """)
 
             self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    full_name TEXT,
+                    username TEXT,
+                    first_seen TEXT,
+                    last_seen TEXT
+                )
+            """)
+
+            self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS fsm_data (
                     key TEXT PRIMARY KEY,
                     state TEXT,
@@ -57,9 +67,54 @@ class Database:
             "SELECT user_id, user_name, text, date FROM feedback WHERE date >= ? ORDER BY date DESC",
             (cutoff,),
         )
-        return [
-            {"user_id": row[0], "user_name": row[1], "text": row[2], "date": row[3]} for row in cursor.fetchall()
-        ]
+        return [{"user_id": row[0], "user_name": row[1], "text": row[2], "date": row[3]} for row in cursor.fetchall()]
+
+    def get_feedback_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+
+    # --- Users ---
+
+    def upsert_user(self, user_id: int, full_name: str | None, username: str | None) -> None:
+        """Register a user on first contact, or refresh their name and last activity."""
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with self.conn:
+            self.conn.execute(
+                """
+                INSERT INTO users (user_id, full_name, username, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    full_name = excluded.full_name,
+                    username = excluded.username,
+                    last_seen = excluded.last_seen
+                """,
+                (user_id, full_name, username, now, now),
+            )
+
+    def remove_user(self, user_id: int) -> None:
+        """Forget a user (e.g. after they blocked the bot)."""
+        with self.conn:
+            self.conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+
+    def get_all_user_ids(self) -> list[int]:
+        return [row[0] for row in self.conn.execute("SELECT user_id FROM users ORDER BY user_id")]
+
+    def get_user_stats(self) -> dict:
+        """Return total users and the number of new/active users over the last day and week."""
+        now = datetime.now()
+        day = (now - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        week = (now - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+
+        def count(where: str, param: str | None = None) -> int:
+            query = "SELECT COUNT(*) FROM users" + (f" WHERE {where}" if where else "")
+            return self.conn.execute(query, (param,) if param else ()).fetchone()[0]
+
+        return {
+            "total": count(""),
+            "new_day": count("first_seen >= ?", day),
+            "new_week": count("first_seen >= ?", week),
+            "active_day": count("last_seen >= ?", day),
+            "active_week": count("last_seen >= ?", week),
+        }
 
     # --- Admin management ---
 

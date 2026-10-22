@@ -9,20 +9,30 @@ LESSONS_API_URL: str = "https://api.guitar0.net/api/v1/lessons/?limit=100"
 CHORDS_API_URL: str = "https://api.guitar0.net/api/v1/chords/?limit=100"
 
 
-async def fetch_or_load_cache(session: aiohttp.ClientSession, url: str, filename: str) -> dict:
+async def fetch_or_load_cache(session: aiohttp.ClientSession, url: str, filename: str, strict: bool = False) -> dict:
+    """Fetch JSON from the API and cache it; fall back to the cached copy if the API is unreachable.
+
+    With ``strict=True`` an API failure is raised instead of silently served from the cache.
+    """
     os.makedirs(API_DIR, exist_ok=True)
     file_path = os.path.join(API_DIR, filename)
 
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as response:
-            if response.status == 200:
-                data = await response.json()
-                async with aiofiles.open(file_path, "w", encoding="utf-8") as file:
-                    json_text = json.dumps(data, ensure_ascii=False, indent=4)
-                    await file.write(json_text)
-                return data
+            if response.status != 200:
+                raise RuntimeError(f"HTTP {response.status}")
+            data = await response.json()
     except Exception:
-        pass
+        if strict:
+            raise
+    else:
+        # A cache write failure must not discard data we have just fetched.
+        try:
+            async with aiofiles.open(file_path, "w", encoding="utf-8") as file:
+                await file.write(json.dumps(data, ensure_ascii=False, indent=4))
+        except Exception:
+            pass
+        return data
 
     if os.path.exists(file_path):
         try:
@@ -35,10 +45,10 @@ async def fetch_or_load_cache(session: aiohttp.ClientSession, url: str, filename
     return {"results": []}
 
 
-async def get_api_data() -> list:
+async def get_api_data(strict: bool = False) -> list:
     async with aiohttp.ClientSession() as session:
-        data_lessons = await fetch_or_load_cache(session, LESSONS_API_URL, "lessons.json")
-        data_chords = await fetch_or_load_cache(session, CHORDS_API_URL, "chords.json")
+        data_lessons = await fetch_or_load_cache(session, LESSONS_API_URL, "lessons.json", strict)
+        data_chords = await fetch_or_load_cache(session, CHORDS_API_URL, "chords.json", strict)
     return [data_lessons, data_chords]
 
 

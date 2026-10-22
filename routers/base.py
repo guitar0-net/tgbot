@@ -9,6 +9,12 @@ from db.database import db
 
 router = Router()
 
+# Menu buttons must keep working while the user is in an input state (not be saved as feedback).
+MENU_BUTTONS = {"📚 Уроки", "🎸 Аккорды", "✍️ Обратная связь", "ℹ️ Команды"}
+
+MAX_FEEDBACK_LENGTH = 2000
+FEEDBACK_TOO_LONG = f"❌ Слишком длинное сообщение (максимум {MAX_FEEDBACK_LENGTH} символов). Сократите его."
+
 
 class FeedbackState(StatesGroup):
     waiting_for_feedback = State()
@@ -52,6 +58,8 @@ async def cmd_cancel(message: types.Message, state: FSMContext):
 @router.message(Command("fb"))
 async def cmd_feedback(message: types.Message, command: CommandObject = None, state: FSMContext = None):
     if command and command.args:
+        if len(command.args) > MAX_FEEDBACK_LENGTH:
+            return await message.answer(FEEDBACK_TOO_LONG)
         if state:
             await state.clear()
         if message.from_user:
@@ -67,7 +75,7 @@ async def cmd_feedback(message: types.Message, command: CommandObject = None, st
     )
 
 
-@router.message(FeedbackState.waiting_for_feedback)
+@router.message(FeedbackState.waiting_for_feedback, ~F.text.in_(MENU_BUTTONS), ~F.text.startswith("/"))
 async def process_feedback(message: types.Message, state: FSMContext):
     if not message.text:
         return await message.answer("Пожалуйста, отправьте текстовое сообщение.")
@@ -75,6 +83,9 @@ async def process_feedback(message: types.Message, state: FSMContext):
     if message.text.strip() == "/cancel":
         await state.clear()
         return await message.answer("❌ Действие отменено.", reply_markup=get_main_keyboard())
+
+    if len(message.text) > MAX_FEEDBACK_LENGTH:
+        return await message.answer(FEEDBACK_TOO_LONG)
 
     if message.from_user:
         db.add_feedback(message.from_user.id, message.from_user.full_name, message.text)
