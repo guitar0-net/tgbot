@@ -1,4 +1,4 @@
-installpdm:
+install-pdm:
 	pip install --user pdm
 
 install-dev:

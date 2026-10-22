@@ -23,11 +23,12 @@ pdm.lock
 *.sqlite3
 db/api/*.json
 
-# Testing
+# Testing & Linting
 .coverage
 coverage.xml
 htmlcov/
 .pytest_cache/
+.ruff_cache/
 
 # Other
 .DS_Store
