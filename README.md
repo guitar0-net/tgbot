@@ -48,6 +48,20 @@ BOT_TOKEN=your-telegram-bot-token
 ADMIN_ID=123456789,987654321
 ```
 
+if you use Docker and do not have `bot_database.db` :
+
+#### Linux/MacOS
+
+```sh
+touch bot_database.db
+```
+
+#### Windows
+
+```sh
+New-Item -ItemType File bot_database.db
+```
+
 ### Run
 
 ```sh
