@@ -247,3 +247,14 @@ class TestDatabasePath:
             assert db_file.exists()
         finally:
             db_instance.conn.close()
+
+    def test_db_path_when_directory(self, tmp_path):
+        target_dir = tmp_path / "bot_database.db"
+        target_dir.mkdir()
+
+        db_instance = Database(str(target_dir))
+        try:
+            assert db_instance.db_name == str(target_dir / "bot.db")
+            assert (target_dir / "bot.db").exists()
+        finally:
+            db_instance.conn.close()

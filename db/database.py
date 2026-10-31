@@ -17,6 +17,11 @@ class Database:
         self.db_name = db_name
 
         if db_name != ":memory:":
+            if os.path.isdir(db_name):
+                # If Docker created a directory instead of a file on host (because file was missing before mount),
+                # use a db file inside this directory to prevent sqlite3.OperationalError crash.
+                db_name = os.path.join(db_name, "bot.db")
+
             db_dir = os.path.dirname(db_name)
             if db_dir:
                 os.makedirs(db_dir, exist_ok=True)
@@ -25,9 +30,12 @@ class Database:
             if (
                 not os.path.exists(db_name)
                 and os.path.exists(legacy_path)
+                and not os.path.isdir(legacy_path)
                 and os.path.abspath(db_name) != os.path.abspath(legacy_path)
             ):
                 shutil.copy2(legacy_path, db_name)
+
+        self.db_name = db_name
         self.conn = sqlite3.connect(db_name, check_same_thread=False)
         self.create_tables()
 
