@@ -222,3 +222,28 @@ class TestSQLiteStorage:
 
     async def test_close_does_not_raise(self, storage):
         await storage.close()
+
+
+class TestDatabasePath:
+    def test_custom_db_path_creates_directory(self, tmp_path):
+        target_dir = tmp_path / "custom_dir"
+        db_file = target_dir / "test.db"
+        assert not target_dir.exists()
+
+        db_instance = Database(str(db_file))
+        try:
+            assert target_dir.exists()
+            assert db_file.exists()
+        finally:
+            db_instance.conn.close()
+
+    def test_db_path_env_var(self, tmp_path, monkeypatch):
+        db_file = tmp_path / "env_test.db"
+        monkeypatch.setenv("DB_PATH", str(db_file))
+
+        db_instance = Database()
+        try:
+            assert db_instance.db_name == str(db_file)
+            assert db_file.exists()
+        finally:
+            db_instance.conn.close()

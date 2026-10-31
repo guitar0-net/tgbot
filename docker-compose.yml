@@ -1,0 +1,11 @@
+services:
+  bot:
+    build: .
+    container_name: guitar0-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Файл базы данных в корне проекта на хосте монтируется в корень /app контейнера.
+      # Все данные сохраняются в один и тот же файл bot_database.db и не перезаписываются при перезапусках.
+      - ./bot_database.db:/app/bot_database.db

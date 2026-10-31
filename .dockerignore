@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Python cache & virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.pdm-python
+pdm.lock
+
+# Secrets & local env
+.env
+.env.*
+!.env.example
+
+# Database & local data (never bake database files into Docker images)
+*.db
+*.sqlite3
+data/
+bot_database.db
+
+# Tests and linting
+tests/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDE & OS
+.vscode/
+.idea/
+.vs/
+.DS_Store

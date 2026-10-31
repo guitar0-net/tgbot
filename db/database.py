@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import sqlite3
 import time
 from collections.abc import Mapping
@@ -9,7 +11,23 @@ from aiogram.fsm.storage.base import BaseStorage, State, StateType, StorageKey
 
 
 class Database:
-    def __init__(self, db_name="bot_database.db"):
+    def __init__(self, db_name: str | None = None):
+        if db_name is None:
+            db_name = os.getenv("DB_PATH", "bot_database.db")
+        self.db_name = db_name
+
+        if db_name != ":memory:":
+            db_dir = os.path.dirname(db_name)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+
+            legacy_path = "bot_database.db"
+            if (
+                not os.path.exists(db_name)
+                and os.path.exists(legacy_path)
+                and os.path.abspath(db_name) != os.path.abspath(legacy_path)
+            ):
+                shutil.copy2(legacy_path, db_name)
         self.conn = sqlite3.connect(db_name, check_same_thread=False)
         self.create_tables()
 
