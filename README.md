@@ -19,7 +19,7 @@
 |---|---|
 | Language | Python 3.13+ |
 | Bot framework | [aiogram](https://docs.aiogram.dev/) 3 |
-| Storage | SQLite |
+| Database | SQLite |
 | Config | `python-dotenv` |
 | Data source | [Guitar 0 API](https://api.guitar0.net/api/v1/docs/redoc/) |
 | Linting | [ruff](https://docs.astral.sh/ruff/) |
