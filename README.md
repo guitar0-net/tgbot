@@ -30,8 +30,8 @@
 ### Installation
 
 ```sh
-git clone https://github.com/zhenya194/guitar0-tgbot.git
-cd guitar0-tgbot
+git clone https://github.com/guitar0-net/tgbot.git
+cd tgbot
 make install
 ```
 
